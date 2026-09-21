@@ -1,7 +1,8 @@
 """Unit tests for PDF document text extraction service and error handling."""
 
+import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import fitz
 import pytest
@@ -130,3 +131,102 @@ def test_extract_document_supports_empty_pdf(
     assert result.pages[0].page_number == 1
     assert result.pages[0].text == ""
 
+
+def test_extract_document_logs_start_and_completion(
+    pdf_service,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Ensures that extraction start and completion are logged."""
+    pdf_path = tmp_path / "sample.pdf"
+
+    pdf_document = fitz.open()
+    pdf_document.new_page()
+    pdf_document.save(pdf_path)
+    pdf_document.close()
+
+    document_id = UUID("12345678-1234-5678-1234-567812345678")
+
+    with caplog.at_level(
+        logging.INFO,
+        logger="backend.app.services.pdf_service",
+    ):
+        result = pdf_service.extract_document(
+            file_path=pdf_path,
+            document_id=document_id,
+        )
+
+    assert "Starting PDF extraction" in caplog.text
+    assert "PDF extraction completed" in caplog.text
+    assert "pages=1" in caplog.text
+    assert result.document_id == document_id
+
+
+def test_extract_document_logs_missing_file(
+    pdf_service,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Ensures that missing files generate an error log."""
+    pdf_path = tmp_path / "missing.pdf"
+    document_id = UUID("12345678-1234-5678-1234-567812345678")
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="backend.app.services.pdf_service",
+    ):
+        with pytest.raises(FileNotFoundError):
+            pdf_service.extract_document(
+                file_path=pdf_path,
+                document_id=document_id,
+            )
+
+    assert "PDF file not found" in caplog.text
+
+
+def test_extract_document_logs_invalid_extension(
+    pdf_service,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Ensures that invalid file extensions generate an error log."""
+    file_path = tmp_path / "sample.txt"
+    file_path.write_text("Not a PDF")
+
+    document_id = UUID("12345678-1234-5678-1234-567812345678")
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="backend.app.services.pdf_service",
+    ):
+        with pytest.raises(InvalidPDFError):
+            pdf_service.extract_document(
+                file_path=file_path,
+                document_id=document_id,
+            )
+
+    assert "Invalid PDF extension" in caplog.text
+
+
+def test_extract_document_logs_invalid_pdf(
+    pdf_service,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Ensures that corrupted PDFs generate an error log."""
+    pdf_path = tmp_path / "corrupted.pdf"
+    pdf_path.write_bytes(b"This is not a valid PDF file.")
+
+    document_id = UUID("12345678-1234-5678-1234-567812345678")
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="backend.app.services.pdf_service",
+    ):
+        with pytest.raises(InvalidPDFError):
+            pdf_service.extract_document(
+                file_path=pdf_path,
+                document_id=document_id,
+            )
+
+    assert "Unable to open PDF file" in caplog.text

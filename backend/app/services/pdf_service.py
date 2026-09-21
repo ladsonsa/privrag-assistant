@@ -6,6 +6,10 @@ from uuid import UUID
 
 import fitz
 
+from backend.app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 class PDFServiceError(Exception):
     """Base exception for PDF service errors."""
@@ -53,18 +57,25 @@ class PDFService:
             FileNotFoundError: If the target file path does not exist on disk.
             InvalidPDFError: If the extension is invalid or PyMuPDF fails to open it.
         """
+        logger.info(
+            "Starting PDF extraction: file=%s, document_id=%s",
+            file_path,
+            document_id,
+        )
+
         if not file_path.exists():
+            logger.error("PDF file not found: %s", file_path)
             raise FileNotFoundError(f"PDF file not found: {file_path}")
 
         if file_path.suffix.lower() != ".pdf":
+            logger.error("Invalid PDF extension: %s", file_path)
             raise InvalidPDFError("The provided file must have a .pdf extension.")
 
         try:
             pdf_document = fitz.open(file_path)
         except Exception as exc:
-            raise InvalidPDFError(
-                f"Unable to open PDF file: {file_path}"
-            ) from exc
+            logger.exception("Unable to open PDF file: %s", file_path)
+            raise InvalidPDFError(f"Unable to open PDF file: {file_path}") from exc
 
         try:
             pages = [
@@ -74,8 +85,22 @@ class PDFService:
                 )
                 for page_index, page in enumerate(pdf_document)
             ]
+        except Exception:
+            logger.exception(
+                "Failed to extract text from PDF: file=%s, document_id=%s",
+                file_path,
+                document_id,
+            )
+            raise
         finally:
             pdf_document.close()
+
+        logger.info(
+            "PDF extraction completed: file=%s, document_id=%s, pages=%d",
+            file_path,
+            document_id,
+            len(pages),
+        )
 
         return PDFDocument(
             document_id=document_id,
