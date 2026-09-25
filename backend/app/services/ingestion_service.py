@@ -3,7 +3,10 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+from backend.app.core.logging import get_logger
 from backend.app.services.pdf_service import PDFDocument
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,16 @@ class IngestionService:
         Raises:
             ValueError: If chunk_size or chunk_overlap parameters are invalid.
         """
+        logger.info(
+            "Starting document chunking",
+            extra={
+                "document_id": str(document.document_id),
+                "document_name": document.document_name,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+            },
+        )
+
         if chunk_size <= 0:
             raise ValueError("chunk_size must be greater than zero.")
 
@@ -81,5 +94,14 @@ class IngestionService:
                     break
 
                 start = end - chunk_overlap
+
+        logger.info(
+            "Document chunking completed",
+            extra={
+                "document_id": str(document.document_id),
+                "document_name": document.document_name,
+                "chunk_count": len(chunks),
+            },
+        )
 
         return chunks
