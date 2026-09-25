@@ -22,8 +22,8 @@ class IngestionService:
     def chunk_document(
         self,
         document: PDFDocument,
-        chunk_size: int,
-        chunk_overlap: int,
+        chunk_size: int = 800,
+        chunk_overlap: int = 100,
     ) -> list[DocumentChunk]:
         """Splits document pages into overlapping text chunks.
 
