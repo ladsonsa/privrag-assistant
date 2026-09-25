@@ -10,6 +10,7 @@ from backend.app.services.pdf_service import PDFDocument
 class DocumentChunk:
     """Represents a chunk of text extracted from a document page."""
 
+    chunk_id: str
     text: str
     document_id: UUID
     document_name: str
@@ -50,6 +51,8 @@ class IngestionService:
 
         chunks: list[DocumentChunk] = []
 
+        chunk_index = 0
+
         for page in document.pages:
             text = page.text
 
@@ -64,12 +67,15 @@ class IngestionService:
 
                 chunks.append(
                     DocumentChunk(
+                        chunk_id=f"{document.document_id}-{chunk_index}",
                         text=chunk_text,
                         document_id=document.document_id,
                         document_name=document.document_name,
                         page_number=page.page_number,
                     )
                 )
+
+                chunk_index += 1
 
                 if end >= len(text):
                     break
